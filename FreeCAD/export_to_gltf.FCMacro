@@ -1,0 +1,87 @@
+# Deprecated as it could not reliably select the correct part
+"""def select_part():
+    objects = FreeCAD.ActiveDocument.Objects
+    part = objects[0]
+    return part.Name"""
+
+# Create the gltf file for export
+def export_files(temp_model_location: str) -> bool:
+    try:
+        selection = FreeCADGui.Selection.getSelection()
+        obj_name = selection[0].Name
+        objects=[]
+        objects.append(FreeCAD.ActiveDocument.getObject(obj_name))
+        import ImportGui
+        ImportGui.export(objects, temp_model_location + '.gltf')
+        del objects
+    except IndexError:
+        time = dt.now().strftime('%H:%M:%S')
+        FreeCAD.Console.PrintError('Please make sure you have your model selected!\n')
+        return False
+    return True
+
+
+# Upload the file
+def upload_file(temp_model_location: str, site_packages_path: str) -> bool:
+    import sys
+    if site_packages_path not in sys.path:
+        sys.path.append(site_packages_path)
+    import requests  # Done sequentially to ensure requests is available on the path
+    files = {  # Paths are absolute, should be updated if being used elsewhere
+        'model': open(temp_model_location + '.gltf', 'rb'),
+        'binary': open(temp_model_location + '.bin', 'rb')
+    }
+    try:
+        r = requests.post('https://2316615a.pythonanywhere.com/upload-file', files=files)
+        if r.status_code == 200:
+            FreeCAD.Console.PrintMessage('Successfully uploaded file\n')
+            return True
+    except requests.exceptions.ConnectionError:
+        FreeCAD.Console.PrintError('Upload failed: Please ensure you have an internet connection\n')
+    return False
+
+
+from datetime import datetime as dt
+now = dt.now()
+file_prefix = now.strftime('%Y_%m_%d_%H_%M_%S')  # Create a file prefix of the current time
+
+# Log users use of the upload and the files they uploaded
+# The logging uses absolute paths which would need to be changed on another device (Feel free to comment out logging)
+def success_log(temp_model_location: str):
+    files = {
+        'model': open(temp_model_location + '.gltf', 'rb'),
+        'binary': open(temp_model_location + '.bin', 'rb')
+    }
+    # Paths are absolute, should be updated if being used on a device that isn't my laptop
+    with open(f'C:\\Users\\jamie\\Workspace\\Uni\\Project\\user_study_logs\\models\\{file_prefix}model.gtlf', 'wb') as f:
+        f.write(files['model'].read())
+    with open(f'C:\\Users\\jamie\\Workspace\\Uni\\Project\\user_study_logs\\models\\{file_prefix}model.bin', 'wb') as f:
+        f.write(files['binary'].read())
+    with open(f'C:\\Users\\jamie\\Workspace\\Uni\\Project\\user_study_logs\\{now.month}_{now.day}.log', 'a') as f:
+        f.write(f'{now.strftime("%Y/%m/%d %H:%M:%S")}| User uploaded to AR at this time\n')
+        FreeCAD.Console.PrintLog(f'{now.strftime("%Y/%m/%d %H:%M:%S")}| User uploaded to AR at this time\n')
+
+
+def failed_export_log():
+    with open(f'C:\\Users\\jamie\\Workspace\\Uni\\Project\\user_study_logs\\{now.month}_{now.day}.log', 'a') as f:
+        f.write(f'{now.strftime("%Y/%m/%d %H:%M:%S")}| Attempted to upload to AR at this time but model was not selected\n')
+        FreeCAD.Console.PrintLog(f'{now.strftime("%Y/%m/%d %H:%M:%S")}| Attempted to upload to AR at this time but model was not selected\n')
+
+
+def failed_upload_log():
+    with open(f'C:\\Users\\jamie\\Workspace\\Uni\\Project\\user_study_logs\\{now.month}_{now.day}.log', 'a') as f:
+        f.write(f'{now.strftime("%Y/%m/%d %H:%M:%S")}| User attempted to upload but there was an issue\n')
+        FreeCAD.Console.PrintLog(f'{now.strftime("%Y/%m/%d %H:%M:%S")}| User attempted to upload but there was an issue\n')
+
+
+# Execute the above functions
+# Note again that the logging uses absolute paths feel from to comment it out
+temp_model_location = u"C:/Users/jamie/Documents/A Docs/Cad/model"  # Temporary file where the gltf will be stored change this to an appropriate directory
+site_packages_path  = "C:\\Python\\Python39\\Lib\\site-packages"  # Change this to wherever your python library is installed
+if export_files(temp_model_location):
+    if upload_file(temp_model_location, site_packages_path):
+        success_log(temp_model_location)
+    else:
+        failed_upload_log()
+else:
+    failed_export_log()
